@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azizbek Turg'unboyev Academy</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #f4f6f9; margin: 0; padding: 15px; color: #333; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        h2, h3 { color: #0088cc; text-align: center; }
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+        button { background-color: #0088cc; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { background-color: #006699; }
+        .hidden { display: none; }
+        .attendance-btn { width: 45%; display: inline-block; padding: 8px; margin: 2px; }
+        .present { background-color: #28a745; }
+        .absent { background-color: #dc3545; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 14px; }
+        th { background-color: #0088cc; color: white; }
+    </style>
+</head>
+<body>
+
+    <h2>Azizbek Turg'unboyev Academy</h2>
+
+    <div id="role-selection" class="card">
+        <h3>Tizimga kirish</h3>
+        <button onclick="showTeacherLogin()">👨‍🏫 O'qituvchi Paneli</button>
+        <button onclick="showStudentLogin()">👨‍🎓 O'quvchi Paneli</button>
+    </div>
+
+    <div id="teacher-login" class="card hidden">
+        <h3>O'qituvchi Kirishi</h3>
+        <input type="text" id="t-login" placeholder="Login">
+        <input type="password" id="t-pass" placeholder="Parol">
+        <button onclick="loginTeacher()">Kirish</button>
+        <button onclick="backToMain()" style="background: #6c757d;">Orqaga</button>
+    </div>
+
+    <div id="teacher-dashboard" class="card hidden">
+        <h3 id="teacher-info"></h3>
+        <hr>
+        <h4>Yangi O'quvchi Qo'shish</h4>
+        <input type="text" id="st-name" placeholder="Ismi Familiyasi">
+        <input type="tel" id="st-phone" placeholder="Telefon (masalan: +998901234567)">
+        <button onclick="addStudent()">O'quvchini Saqlash</button>
+
+        <hr>
+        <h4>Kunlik Davomat</h4>
+        <div id="student-list"></div>
+
+        <hr>
+        <h4>Kunlik Vazifa Yuborish</h4>
+        <textarea id="task-text" style="width: 100%; height: 60px; border-radius: 8px; border: 1px solid #ccc;"></textarea>
+        <button onclick="sendHomework()">Vazifani Joylash</button>
+    </div>
+
+    <div id="student-login" class="card hidden">
+        <h3>O'quvchi Kirishi</h3>
+        <input type="text" id="s-fullname" placeholder="To'liq Ismingiz">
+        <input type="tel" id="s-phone" placeholder="Telefon raqamingiz">
+        <button onclick="loginStudent()">Tekshirish</button>
+        <button onclick="backToMain()" style="background: #6c757d;">Orqaga</button>
+    </div>
+
+    <div id="student-dashboard" class="card hidden">
+        <h3 id="student-welcome"></h3>
+        <p><b>O'qiladigan fan:</b> <span id="student-subject"></span></p>
+        
+        <h4>Oylik Davomat va O'zlashtirish</h4>
+        <table>
+            <thead>
+                <tr>
+                    <th>Sana</th>
+                    <th>Holat</th>
+                </tr>
+            </thead>
+            <tbody id="attendance-history"></tbody>
+        </table>
+
+        <h4>O'qituvchi Yuborgan Vazifalar</h4>
+        <div id="homework-list"></div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let currentTeacher = null;
+        let studentsDB = JSON.parse(localStorage.getItem('studentsDB')) || [];
+        let attendanceDB = JSON.parse(localStorage.getItem('attendanceDB')) || [];
+        let homeworkDB = JSON.parse(localStorage.getItem('homeworkDB')) || [];
+
+        function backToMain() {
+            document.querySelectorAll('.card').forEach(el => el.classList.add('hidden'));
+            document.getElementById('role-selection').classList.remove('hidden');
+        }
+
+        function showTeacherLogin() {
+            backToMain();
+            document.getElementById('role-selection').classList.add('hidden');
+            document.getElementById('teacher-login').classList.remove('hidden');
+        }
+
+        function showStudentLogin() {
+            backToMain();
+            document.getElementById('role-selection').classList.add('hidden');
+            document.getElementById('student-login').classList.remove('hidden');
+        }
+
+        function loginTeacher() {
+            const login = document.getElementById('t-login').value;
+            const pass = document.getElementById('t-pass').value;
+
+            if(login === 'admin' && pass === '1234') {
+                currentTeacher = { name: "Azizbek Turg'unboyev", subject: "Matematika" };
+                document.getElementById('teacher-info').innerText = `O'qituvchi: ${currentTeacher.name} (${currentTeacher.subject})`;
+                document.getElementById('teacher-login').classList.add('hidden');
+                document.getElementById('teacher-dashboard').classList.remove('hidden');
+                renderStudentList();
+            } else {
+                alert("Login yoki parol xato!");
+            }
+        }
+
+        function addStudent() {
+            const name = document.getElementById('st-name').value;
+            const phone = document.getElementById('st-phone').value;
+
+            if(name && phone) {
+                studentsDB.push({ name, phone, subject: currentTeacher.subject });
+                localStorage.setItem('studentsDB', JSON.stringify(studentsDB));
+                alert("O'quvchi muvaffaqiyatli qo'shildi!");
+                document.getElementById('st-name').value = '';
+                document.getElementById('st-phone').value = '';
+                renderStudentList();
+            } else {
+                alert("Ma'lumotlarni to'liq kiriting!");
+            }
+        }
+
+        function renderStudentList() {
+            const list = document.getElementById('student-list');
+            list.innerHTML = '';
+            studentsDB.forEach((st, idx) => {
+                list.innerHTML += `
+                    <div style="margin-bottom: 10px; text-align: left;">
+                        <b>${st.name}</b> (${st.phone})<br>
+                        <button class="attendance-btn present" onclick="markAttendance(${idx}, 'keldi')">✅ Keldi</button>
+                        <button class="attendance-btn absent" onclick="markAttendance(${idx}, 'kelmadi')">❌ Kelmadi</button>
+                    </div>
+                `;
+            });
+        }
+
+        function markAttendance(idx, status) {
+            const student = studentsDB[idx];
+            const date = new Date().toLocaleDateString();
+
+            attendanceDB.push({ phone: student.phone, date, status });
+            localStorage.setItem('attendanceDB', JSON.stringify(attendanceDB));
+
+            tg.sendData(JSON.stringify({
+                action: 'attendance_notification',
+                full_name: student.name,
+                phone: student.phone,
+                status: status
+            }));
+        }
+
+        function sendHomework() {
+            const task = document.getElementById('task-text').value;
+            if(task) {
+                homeworkDB.push({ subject: currentTeacher.subject, task, date: new Date().toLocaleDateString() });
+                localStorage.setItem('homeworkDB', JSON.stringify(homeworkDB));
+                alert("Vazifa muvaffaqiyatli saqlandi!");
+                document.getElementById('task-text').value = '';
+            }
+        }
+
+        function loginStudent() {
+            const phone = document.getElementById('s-phone').value;
+            const student = studentsDB.find(s => s.phone === phone);
+
+            if(student) {
+                document.getElementById('student-welcome').innerText = `Xush kelibsiz, ${student.name}!`;
+                document.getElementById('student-subject').innerText = student.subject;
+
+                const attList = document.getElementById('attendance-history');
+                attList.innerHTML = '';
+                attendanceDB.filter(a => a.phone === phone).forEach(a => {
+                    attList.innerHTML += `<tr><td>${a.date}</td><td>${a.status === 'keldi' ? '✅ Keldi' : '❌ Kelmadi'}</td></tr>`;
+                });
+
+                const hwList = document.getElementById('homework-list');
+                hwList.innerHTML = '';
+                homeworkDB.filter(h => h.subject === student.subject).forEach(h => {
+                    hwList.innerHTML += `<p>📌 <b>${h.date}:</b> ${h.task}</p>`;
+                });
+
+                document.getElementById('student-login').classList.add('hidden');
+                document.getElementById('student-dashboard').classList.remove('hidden');
+            } else {
+                alert("Ushbu telefon raqami bazada topilmadi!");
+            }
+        }
+    </script>
+</body>
+  </html>
+  
